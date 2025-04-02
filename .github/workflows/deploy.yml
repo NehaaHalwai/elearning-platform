@@ -1,7 +1,9 @@
-name: Deploy PHN Platform
+name: Deploy eLearning Platform
 
 on:
   push:
+    branches: [ main ]
+  pull_request:
     branches: [ main ]
 
 jobs:
@@ -9,7 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v2
     
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
@@ -25,7 +28,7 @@ jobs:
     - name: Build, tag, and push frontend image to Amazon ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: phn-platform-frontend
+        ECR_REPOSITORY: elearning-platform-frontend
         IMAGE_TAG: ${{ github.sha }}
       run: |
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile.frontend .
@@ -34,15 +37,39 @@ jobs:
     - name: Build, tag, and push backend image to Amazon ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: phn-platform-backend
+        ECR_REPOSITORY: elearning-platform-backend
         IMAGE_TAG: ${{ github.sha }}
       run: |
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile.backend .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
     
     - name: Update kube config
-      run: aws eks update-kubeconfig --name phn-platform-cluster --region us-east-1
+      run: aws eks update-kubeconfig --name elearning-platform-cluster --region us-east-1
+    
+    - name: Update Kubernetes secrets
+      run: |
+        # Create base64 encoded secrets from GitHub secrets
+        SECRET_KEY_BASE64=$(echo -n "${{ secrets.APP_SECRET_KEY }}" | base64)
+        MONGODB_URI_BASE64=$(echo -n "${{ secrets.MONGODB_URI }}" | base64)
+        PAYMENT_API_KEY_BASE64=$(echo -n "${{ secrets.PAYMENT_API_KEY }}" | base64)
+        
+        # Replace placeholders in secrets.yaml
+        sed -i "s|\${SECRET_KEY_BASE64}|$SECRET_KEY_BASE64|g" k8s/secrets.yaml
+        sed -i "s|\${MONGODB_URI_BASE64}|$MONGODB_URI_BASE64|g" k8s/secrets.yaml
+        sed -i "s|\${PAYMENT_API_KEY_BASE64}|$PAYMENT_API_KEY_BASE64|g" k8s/secrets.yaml
     
     - name: Deploy to EKS
       run: |
-        kubectl apply -f k8s/
+        # Update image tags in deployment files
+        sed -i "s|\${ECR_REGISTRY}|${{ steps.login-ecr.outputs.registry }}|g" k8s/backend-deployment.yaml
+        sed -i "s|\${IMAGE_TAG}|${{ github.sha }}|g" k8s/backend-deployment.yaml
+        sed -i "s|\${ECR_REGISTRY}|${{ steps.login-ecr.outputs.registry }}|g" k8s/frontend-deployment.yaml
+        sed -i "s|\${IMAGE_TAG}|${{ github.sha }}|g" k8s/frontend-deployment.yaml
+        
+        # Apply Kubernetes manifests in the correct order
+        kubectl apply -f k8s/secrets.yaml
+        kubectl apply -f k8s/mongodb.yaml
+        kubectl apply -f k8s/backend-deployment.yaml
+        kubectl apply -f k8s/frontend-deployment.yaml
+        kubectl apply -f k8s/monitoring.yaml
+        kubectl apply -f k8s/ingress.yaml
