@@ -14,8 +14,7 @@ spec:
     spec:
       containers:
       - name: backend
-        # Update the image name to match your repository
-        image: ${ECR_REGISTRY}/elearning-platform-backend:${IMAGE_TAG}
+        image: nginx:latest  # Temporary image for testing
         ports:
         - containerPort: 8000
         env:
@@ -23,7 +22,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: app-secrets
-              key: secret-key
+              key: SECRET_KEY
         - name: ALGORITHM
           value: "HS256"
         - name: ACCESS_TOKEN_EXPIRE_MINUTES
@@ -32,12 +31,12 @@ spec:
           valueFrom:
             secretKeyRef:
               name: app-secrets
-              key: mongodb-uri
+              key: MONGODB_URI
         - name: PAYMENT_GATEWAY_API_KEY
           valueFrom:
             secretKeyRef:
               name: app-secrets
-              key: payment-api-key
+              key: PAYMENT_API_KEY
         - name: PAYMENT_GATEWAY_URL
           value: "https://dummy-payment-gateway.example.com/api/v1"
 ---
@@ -51,3 +50,4 @@ spec:
   ports:
   - port: 8000
     targetPort: 8000
+  type: ClusterIP

@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: ${ECR_REGISTRY}/elearning-platform-frontend:${IMAGE_TAG}
+        image: nginx:latest  # Temporary image for testing
         ports:
         - containerPort: 3000
         env:
@@ -31,4 +31,4 @@ spec:
   ports:
   - port: 80
     targetPort: 3000
-  type: LoadBalancer
+  type: ClusterIP

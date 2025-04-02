@@ -1,10 +1,8 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: mongodb
 spec:
-  serviceName: mongodb-service
-  replicas: 1
   selector:
     matchLabels:
       app: mongodb
@@ -15,20 +13,16 @@ spec:
     spec:
       containers:
       - name: mongodb
-        image: mongo:latest
+        image: mongo:4.4
         ports:
         - containerPort: 27017
         volumeMounts:
         - name: mongodb-data
           mountPath: /data/db
-  volumeClaimTemplates:
-  - metadata:
-      name: mongodb-data
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      resources:
-        requests:
-          storage: 10Gi
+      volumes:
+      - name: mongodb-data
+        persistentVolumeClaim:
+          claimName: mongodb-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -40,3 +34,16 @@ spec:
   ports:
   - port: 27017
     targetPort: 27017
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ebs-sc
+  resources:
+    requests:
+      storage: 10Gi
