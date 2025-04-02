@@ -21,8 +21,7 @@ spec:
           mountPath: /data/db
       volumes:
       - name: mongodb-data
-        persistentVolumeClaim:
-          claimName: mongodb-data
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
